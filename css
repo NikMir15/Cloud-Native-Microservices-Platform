@@ -1,0 +1,12 @@
+cloud-native-microservices-platform
+│
+├── services
+│   ├── auth-service
+│   │   └── app
+│   ├── product-service
+│   │   └── app
+│   └── order-service
+│       └── app
+│
+├── scripts
+└── docs
