@@ -1,0 +1,90 @@
+{
+  "family": "microservices-task",
+  "networkMode": "awsvpc",
+  "requiresCompatibilities": ["FARGATE"],
+  "cpu": "1024",
+  "memory": "2048",
+  "executionRoleArn": "arn:aws:iam::542879660337:role/ecsTaskExecutionRole",
+  "containerDefinitions": [
+  {
+    "name": "gateway",
+    "image": "542879660337.dkr.ecr.eu-west-2.amazonaws.com/gateway:latest",
+    "essential": true,
+    "portMappings": [
+      {
+        "containerPort": 80,
+        "protocol": "tcp"
+      }
+    ],
+    "logConfiguration": {
+      "logDriver": "awslogs",
+      "options": {
+        "awslogs-group": "/ecs/microservices-platform",
+        "awslogs-region": "eu-west-2",
+        "awslogs-stream-prefix": "gateway"
+      }
+    }
+  },
+  {
+    "name": "auth-service",
+    "image": "542879660337.dkr.ecr.eu-west-2.amazonaws.com/auth-service:latest",
+    "essential": true,
+    "portMappings": [
+      {
+        "containerPort": 8001,
+        "protocol": "tcp"
+      }
+    ],
+    "environment": [
+      { "name": "SECRET_KEY", "value": "supersecret" },
+      { "name": "ALGORITHM", "value": "HS256" }
+    ],
+    "logConfiguration": {
+      "logDriver": "awslogs",
+      "options": {
+        "awslogs-group": "/ecs/microservices-platform",
+        "awslogs-region": "eu-west-2",
+        "awslogs-stream-prefix": "auth"
+      }
+    }
+  },
+  {
+    "name": "product-service",
+    "image": "542879660337.dkr.ecr.eu-west-2.amazonaws.com/product-service:latest",
+    "essential": true,
+    "portMappings": [
+      {
+        "containerPort": 8002,
+        "protocol": "tcp"
+      }
+    ],
+    "logConfiguration": {
+      "logDriver": "awslogs",
+      "options": {
+        "awslogs-group": "/ecs/microservices-platform",
+        "awslogs-region": "eu-west-2",
+        "awslogs-stream-prefix": "product"
+      }
+    }
+  },
+  {
+    "name": "order-service",
+    "image": "542879660337.dkr.ecr.eu-west-2.amazonaws.com/order-service:latest",
+    "essential": true,
+    "portMappings": [
+      {
+        "containerPort": 8003,
+        "protocol": "tcp"
+      }
+    ],
+    "logConfiguration": {
+      "logDriver": "awslogs",
+      "options": {
+        "awslogs-group": "/ecs/microservices-platform",
+        "awslogs-region": "eu-west-2",
+        "awslogs-stream-prefix": "order"
+      }
+    }
+  }
+]
+}
