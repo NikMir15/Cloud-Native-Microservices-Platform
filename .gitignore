@@ -1,46 +1,46 @@
+# ========================
 # Python
+# ========================
 __pycache__/
 *.pyc
 *.pyo
 *.pyd
-*.sqlite3
-*.log
-
-# Virtual envs
+.env
+.env.*
 .venv/
 venv/
 
+# ========================
+# Docker
+# ========================
+*.log
+docker-compose.override.yml
+Dockerfile.dev
+
+# ========================
+# AWS / ECS
+# ========================
+ecs-params.yml
+taskdef.local.json
+secrets.json
+
+# ========================
+# Node / Frontend (safe even if unused)
+# ========================
+node_modules/
+npm-debug.log*
+yarn-error.log*
+
+# ========================
 # OS / Editor
+# ========================
 .DS_Store
 Thumbs.db
 .vscode/
+.idea/
 
-# Docker
-*.env
-
-# Tests / coverage
-.pytest_cache/
-.coverage
-htmlcov/
-
-# Environment variables / secrets
-.env
-.env.*
-*.env
-
-# Python
-__pycache__/
-*.pyc
-.venv/
-
-# Node / frontend (if any)
-node_modules/
-
-# Logs
-*.log
-
-# IDE
-.vscode/
-
-# OS
-.DS_Store
+# ========================
+# Git
+# ========================
+.git/
+.gitignore.bak
