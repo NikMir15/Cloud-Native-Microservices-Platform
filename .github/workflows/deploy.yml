@@ -1,28 +1,22 @@
-name: Build and Deploy to ECS
+name: Deploy to AWS ECS
 
 on:
   push:
-    branches: [ "main" ]
+    branches: [ main ]
 
 env:
-  AWS_REGION: eu-west-2
-
-  # Update these to match your ECR repo names
-  ECR_GATEWAY_REPO: gateway
-  ECR_AUTH_REPO: auth-service
-  ECR_PRODUCTS_REPO: products-service
-  ECR_ORDER_REPO: order-service
-
-  # Update these to match your ECS setup
-  ECS_CLUSTER: microservices-cluster
-  ECS_SERVICE: microservices-service
+  AWS_REGION: ${{ secrets.AWS_REGION }}
+  AWS_ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID }}
+  ECS_CLUSTER: ${{ secrets.ECS_CLUSTER }}
+  ECS_SERVICE: ${{ secrets.ECS_SERVICE }}
+  ECS_TASK_FAMILY: ${{ secrets.ECS_TASK_FAMILY }}
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout
+      - name: Checkout code
         uses: actions/checkout@v4
 
       - name: Configure AWS credentials
@@ -30,43 +24,22 @@ jobs:
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ secrets.AWS_REGION }}
+          aws-region: ${{ env.AWS_REGION }}
 
       - name: Login to Amazon ECR
         id: login-ecr
         uses: aws-actions/amazon-ecr-login@v2
 
-      - name: Set image tag
-        run: echo "IMAGE_TAG=${GITHUB_SHA::7}" >> $GITHUB_ENV
-
-      # ---------- Build & Push: Gateway ----------
-      - name: Build and push gateway
+      # Example: build & push gateway (repeat later for others)
+      - name: Build & Push Gateway
         run: |
-          docker build -t ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_GATEWAY_REPO }}:${{ env.IMAGE_TAG }} -f gateway/Dockerfile.ecs gateway
-          docker push ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_GATEWAY_REPO }}:${{ env.IMAGE_TAG }}
+          docker build -t gateway ./gateway
+          docker tag gateway:latest $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/gateway:latest
+          docker push $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/gateway:latest
 
-      # ---------- Build & Push: Auth ----------
-      - name: Build and push auth-service
-        run: |
-          docker build -t ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_AUTH_REPO }}:${{ env.IMAGE_TAG }} services/auth-service
-          docker push ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_AUTH_REPO }}:${{ env.IMAGE_TAG }}
-
-      # ---------- Build & Push: Products ----------
-      - name: Build and push products-service
-        run: |
-          docker build -t ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_PRODUCTS_REPO }}:${{ env.IMAGE_TAG }} services/products-service
-          docker push ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_PRODUCTS_REPO }}:${{ env.IMAGE_TAG }}
-
-      # ---------- Build & Push: Order ----------
-      - name: Build and push order-service
-        run: |
-          docker build -t ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_ORDER_REPO }}:${{ env.IMAGE_TAG }} services/order-service
-          docker push ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_ORDER_REPO }}:${{ env.IMAGE_TAG }}
-
-      # Force ECS redeploy (uses latest task def already in ECS)
-      - name: Force ECS redeploy
+      - name: Force ECS deployment
         run: |
           aws ecs update-service \
-            --cluster ${{ env.ECS_CLUSTER }} \
-            --service ${{ env.ECS_SERVICE }} \
+            --cluster $ECS_CLUSTER \
+            --service $ECS_SERVICE \
             --force-new-deployment
