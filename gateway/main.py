@@ -6,10 +6,13 @@ app = FastAPI()
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
-        "https://nikmir15.github.io",
-        "https://nikmir15.github.io/Cloud-Native-Microservices-Platform"
+        "https://nikmir15.github.io"
     ],
-    allow_credentials=True,
-    allow_methods=["*"],
+    allow_credentials=False,
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allow_headers=["*"],
 )
+
+@app.get("/health")
+def health():
+    return "ok"
