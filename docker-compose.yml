@@ -34,3 +34,7 @@ services:
       - auth-service
       - product-service
       - order-service
+
+# NOTE:
+# dev-secret-change-me is a placeholder.
+# Real secrets are injected via environment variables in production (ECS).
