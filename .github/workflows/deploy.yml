@@ -2,20 +2,22 @@ name: deploy
 
 on:
   push:
-    branches: [ "main" ]
-  workflow_dispatch:
+    branches: ["main"]
 
 env:
   AWS_REGION: eu-west-2
 
-  #  Your ECS details
+  # ✅ Your ECS names (from your screenshots)
   ECS_CLUSTER: microservices-platform
   ECS_SERVICE: microservices-service
 
-  #  Single taskdef containing ALL containers
-  TASK_DEFINITION: ecs/taskdef.json
+  # ✅ Taskdef files in your repo
+  TASKDEF_GATEWAY: ecs/taskdef-gateway.json
+  TASKDEF_AUTH: ecs/taskdef.json
+  TASKDEF_ORDER: ecs/taskdef.raw.json
+  TASKDEF_PRODUCT: ecs/taskdef.raw.json
 
-  #  Container names must match your taskdef.json containerDefinitions[].name
+  # ✅ Container names inside taskdefs (must match JSON "name")
   CONTAINER_GATEWAY: gateway
   CONTAINER_AUTH: auth-service
   CONTAINER_ORDER: order-service
@@ -29,7 +31,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      #  Configure AWS creds (GitHub Secrets)
+      # 1) AWS creds (use your GitHub Secrets)
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
@@ -37,82 +39,82 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ env.AWS_REGION }}
 
-      #  Login to ECR (gives us registry like 123456789.dkr.ecr.eu-west-2.amazonaws.com)
+      # 2) Login to ECR
       - name: Login to Amazon ECR
         id: login-ecr
         uses: aws-actions/amazon-ecr-login@v2
 
-      #  Set image tag (fixes your IMAGE_TAG issue properly)
+      # 3) Set image tag (commit SHA)
       - name: Set image tag
-        id: vars
-        run: echo "IMAGE_TAG=${GITHUB_SHA}" >> $GITHUB_OUTPUT
+        run: echo "IMAGE_TAG=${GITHUB_SHA}" >> $GITHUB_ENV
 
-      # -----------------------------
-      # BUILD & PUSH (NO CACHE)
-      # -----------------------------
+      # 4) Build + push images (NO CACHE)
       - name: Build & Push gateway (NO CACHE)
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
         run: |
-          docker build --no-cache -t ${{ steps.login-ecr.outputs.registry }}/gateway:${{ steps.vars.outputs.IMAGE_TAG }} -f gateway/Dockerfile.ecs gateway
-          docker push ${{ steps.login-ecr.outputs.registry }}/gateway:${{ steps.vars.outputs.IMAGE_TAG }}
+          docker build --no-cache -t $ECR_REGISTRY/gateway:${IMAGE_TAG} -f gateway/Dockerfile.ecs gateway
+          docker push $ECR_REGISTRY/gateway:${IMAGE_TAG}
 
       - name: Build & Push auth-service (NO CACHE)
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
         run: |
-          docker build --no-cache -t ${{ steps.login-ecr.outputs.registry }}/auth-service:${{ steps.vars.outputs.IMAGE_TAG }} -f services/auth-service/Dockerfile services/auth-service
-          docker push ${{ steps.login-ecr.outputs.registry }}/auth-service:${{ steps.vars.outputs.IMAGE_TAG }}
+          docker build --no-cache -t $ECR_REGISTRY/auth-service:${IMAGE_TAG} -f services/auth-service/Dockerfile services/auth-service
+          docker push $ECR_REGISTRY/auth-service:${IMAGE_TAG}
 
       - name: Build & Push order-service (NO CACHE)
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
         run: |
-          docker build --no-cache -t ${{ steps.login-ecr.outputs.registry }}/order-service:${{ steps.vars.outputs.IMAGE_TAG }} -f services/order-service/Dockerfile services/order-service
-          docker push ${{ steps.login-ecr.outputs.registry }}/order-service:${{ steps.vars.outputs.IMAGE_TAG }}
+          docker build --no-cache -t $ECR_REGISTRY/order-service:${IMAGE_TAG} -f services/order-service/Dockerfile services/order-service
+          docker push $ECR_REGISTRY/order-service:${IMAGE_TAG}
 
       - name: Build & Push product-service (NO CACHE)
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
         run: |
-          docker build --no-cache -t ${{ steps.login-ecr.outputs.registry }}/product-service:${{ steps.vars.outputs.IMAGE_TAG }} -f services/product-service/Dockerfile services/product-service
-          docker push ${{ steps.login-ecr.outputs.registry }}/product-service:${{ steps.vars.outputs.IMAGE_TAG }}
+          docker build --no-cache -t $ECR_REGISTRY/product-service:${IMAGE_TAG} -f services/product-service/Dockerfile services/product-service
+          docker push $ECR_REGISTRY/product-service:${IMAGE_TAG}
 
-      # -----------------------------
-      # RENDER TASK DEF (UPDATE IMAGES)
-      # We start from ecs/taskdef.json and keep updating it
-      # -----------------------------
+      # 5) Render task defs with NEW image tags
       - name: Render task definition (gateway)
-        id: taskdef-gateway
+        id: render-gateway
         uses: aws-actions/amazon-ecs-render-task-definition@v1
         with:
-          task-definition: ${{ env.TASK_DEFINITION }}
+          task-definition: ${{ env.TASKDEF_GATEWAY }}
           container-name: ${{ env.CONTAINER_GATEWAY }}
-          image: ${{ steps.login-ecr.outputs.registry }}/gateway:${{ steps.vars.outputs.IMAGE_TAG }}
+          image: ${{ steps.login-ecr.outputs.registry }}/gateway:${{ env.IMAGE_TAG }}
 
       - name: Render task definition (auth-service)
-        id: taskdef-auth
+        id: render-auth
         uses: aws-actions/amazon-ecs-render-task-definition@v1
         with:
-          task-definition: ${{ steps.taskdef-gateway.outputs.task-definition }}
+          task-definition: ${{ env.TASKDEF_AUTH }}
           container-name: ${{ env.CONTAINER_AUTH }}
-          image: ${{ steps.login-ecr.outputs.registry }}/auth-service:${{ steps.vars.outputs.IMAGE_TAG }}
+          image: ${{ steps.login-ecr.outputs.registry }}/auth-service:${{ env.IMAGE_TAG }}
 
       - name: Render task definition (order-service)
-        id: taskdef-order
+        id: render-order
         uses: aws-actions/amazon-ecs-render-task-definition@v1
         with:
-          task-definition: ${{ steps.taskdef-auth.outputs.task-definition }}
+          task-definition: ${{ env.TASKDEF_ORDER }}
           container-name: ${{ env.CONTAINER_ORDER }}
-          image: ${{ steps.login-ecr.outputs.registry }}/order-service:${{ steps.vars.outputs.IMAGE_TAG }}
+          image: ${{ steps.login-ecr.outputs.registry }}/order-service:${{ env.IMAGE_TAG }}
 
       - name: Render task definition (product-service)
-        id: taskdef-product
+        id: render-product
         uses: aws-actions/amazon-ecs-render-task-definition@v1
         with:
-          task-definition: ${{ steps.taskdef-order.outputs.task-definition }}
+          task-definition: ${{ env.TASKDEF_PRODUCT }}
           container-name: ${{ env.CONTAINER_PRODUCT }}
-          image: ${{ steps.login-ecr.outputs.registry }}/product-service:${{ steps.vars.outputs.IMAGE_TAG }}
+          image: ${{ steps.login-ecr.outputs.registry }}/product-service:${{ env.IMAGE_TAG }}
 
-      # -----------------------------
-      # DEPLOY TO ECS (ONE SERVICE)
-      # -----------------------------
+      # 6) Deploy to ECS (single service) - deploy using the gateway rendered taskdef
       - name: Deploy to ECS
         uses: aws-actions/amazon-ecs-deploy-task-definition@v2
         with:
-          task-definition: ${{ steps.taskdef-product.outputs.task-definition }}
+          task-definition: ${{ steps.render-gateway.outputs.task-definition }}
           service: ${{ env.ECS_SERVICE }}
           cluster: ${{ env.ECS_CLUSTER }}
           wait-for-service-stability: true
