@@ -1,3 +1,23 @@
-FROM nginx:alpine
+FROM python:3.11-slim
+
+# Install nginx
+RUN apt-get update && apt-get install -y --no-install-recommends nginx curl \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+# Python deps
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+# App code
+COPY . .
+
+# IMPORTANT: use ECS nginx config
 COPY nginx.ecs.conf /etc/nginx/nginx.conf
+
+# Expose HTTP (ALB talks to this)
 EXPOSE 80
+
+# Start both: FastAPI + Nginx
+CMD ["sh", "-c", "uvicorn main:app --host 0.0.0.0 --port 8000 & nginx -g 'daemon off;'"]
