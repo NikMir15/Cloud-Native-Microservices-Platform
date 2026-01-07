@@ -1,19 +1,33 @@
-name: Deploy to AWS ECS
+name: deploy
 
 on:
   push:
-    branches: [ main ]
+    branches: [ "main" ]
 
 env:
-  AWS_REGION: ${{ secrets.AWS_REGION }}
-  AWS_ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID }}
-  ECS_CLUSTER: ${{ secrets.ECS_CLUSTER }}
-  ECS_SERVICE: ${{ secrets.ECS_SERVICE }}
+  AWS_REGION: eu-west-2
 
-  ECR_GATEWAY_REPO: gateway
-  ECR_AUTH_REPO: auth-service
-  ECR_ORDER_REPO: order-service
-  ECR_PRODUCT_REPO: product-service
+  # Unique tag every deploy (forces ECS to pull new image)
+  IMAGE_TAG: ${{ github.sha }}
+
+  # --------- CHANGE THESE (use your existing values) ----------
+  ECR_REGISTRY: CHANGE_ME_ECR_REGISTRY              # example: 542879660337.dkr.ecr.eu-west-2.amazonaws.com
+  ECS_CLUSTER: CHANGE_ME_CLUSTER_NAME               # example: microservices-platform
+
+  ECS_SERVICE_GATEWAY: CHANGE_ME_GATEWAY_SERVICE    # example: gateway-service
+  ECS_SERVICE_AUTH: CHANGE_ME_AUTH_SERVICE          # example: auth-service
+  ECS_SERVICE_ORDER: CHANGE_ME_ORDER_SERVICE        # example: order-service
+  ECS_SERVICE_PRODUCT: CHANGE_ME_PRODUCT_SERVICE    # example: product-service
+
+  ECS_TASKDEF_GATEWAY: ecs/taskdef-gateway.json
+  ECS_TASKDEF_AUTH: ecs/taskdef-auth.json
+  ECS_TASKDEF_ORDER: ecs/taskdef-order.json
+  ECS_TASKDEF_PRODUCT: ecs/taskdef-product.json
+
+  CONTAINER_NAME_GATEWAY: gateway
+  CONTAINER_NAME_AUTH: auth-service
+  CONTAINER_NAME_ORDER: order-service
+  CONTAINER_NAME_PRODUCT: product-service
 
 jobs:
   deploy:
@@ -34,72 +48,103 @@ jobs:
         id: login-ecr
         uses: aws-actions/amazon-ecr-login@v2
 
-      # Use commit SHA as image tag (best practice)
-      - name: Set image tag
-        run: echo "IMAGE_TAG=${GITHUB_SHA}" >> $GITHUB_ENV
-
-      - name: Build & Push gateway
+      # -------------------------
+      # BUILD + PUSH IMAGES (NO CACHE)
+      # -------------------------
+      - name: Build & Push gateway (NO CACHE)
         run: |
-          docker build -t gateway ./gateway
-          docker tag gateway:latest $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_GATEWAY_REPO:$IMAGE_TAG
-          docker push $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_GATEWAY_REPO:$IMAGE_TAG
+          docker build --no-cache \
+            -t $ECR_REGISTRY/gateway:${IMAGE_TAG} \
+            -f gateway/Dockerfile.ecs gateway
+          docker push $ECR_REGISTRY/gateway:${IMAGE_TAG}
 
-      - name: Build & Push auth-service
+      - name: Build & Push auth-service (NO CACHE)
         run: |
-          docker build -t auth-service ./services/auth-service
-          docker tag auth-service:latest $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_AUTH_REPO:$IMAGE_TAG
-          docker push $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_AUTH_REPO:$IMAGE_TAG
+          docker build --no-cache \
+            -t $ECR_REGISTRY/auth-service:${IMAGE_TAG} \
+            -f services/auth-service/Dockerfile services/auth-service
+          docker push $ECR_REGISTRY/auth-service:${IMAGE_TAG}
 
-      - name: Build & Push order-service
+      - name: Build & Push order-service (NO CACHE)
         run: |
-          docker build -t order-service ./services/order-service
-          docker tag order-service:latest $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_ORDER_REPO:$IMAGE_TAG
-          docker push $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_ORDER_REPO:$IMAGE_TAG
+          docker build --no-cache \
+            -t $ECR_REGISTRY/order-service:${IMAGE_TAG} \
+            -f services/order-service/Dockerfile services/order-service
+          docker push $ECR_REGISTRY/order-service:${IMAGE_TAG}
 
-      - name: Build & Push product-service
+      - name: Build & Push product-service (NO CACHE)
         run: |
-          docker build -t product-service ./services/product-service
-          docker tag product-service:latest $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_PRODUCT_REPO:$IMAGE_TAG
-          docker push $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_PRODUCT_REPO:$IMAGE_TAG
+          docker build --no-cache \
+            -t $ECR_REGISTRY/product-service:${IMAGE_TAG} \
+            -f services/product-service/Dockerfile services/product-service
+          docker push $ECR_REGISTRY/product-service:${IMAGE_TAG}
 
-      # Render task definition (update images in the JSON)
+      # -------------------------
+      # RENDER TASK DEFINITIONS (inject new image tags)
+      # -------------------------
       - name: Render taskdef (gateway)
-        id: taskdef1
+        id: render-gateway
         uses: aws-actions/amazon-ecs-render-task-definition@v1
         with:
-          task-definition: ecs/taskdef.json
-          container-name: gateway
-          image: ${{ env.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/gateway:${{ env.IMAGE_TAG }}
+          task-definition: ${{ env.ECS_TASKDEF_GATEWAY }}
+          container-name: ${{ env.CONTAINER_NAME_GATEWAY }}
+          image: ${{ env.ECR_REGISTRY }}/gateway:${{ env.IMAGE_TAG }}
 
       - name: Render taskdef (auth-service)
-        id: taskdef2
+        id: render-auth
         uses: aws-actions/amazon-ecs-render-task-definition@v1
         with:
-          task-definition: ${{ steps.taskdef1.outputs.task-definition }}
-          container-name: auth-service
-          image: ${{ env.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/auth-service:${{ env.IMAGE_TAG }}
+          task-definition: ${{ env.ECS_TASKDEF_AUTH }}
+          container-name: ${{ env.CONTAINER_NAME_AUTH }}
+          image: ${{ env.ECR_REGISTRY }}/auth-service:${{ env.IMAGE_TAG }}
 
       - name: Render taskdef (order-service)
-        id: taskdef3
+        id: render-order
         uses: aws-actions/amazon-ecs-render-task-definition@v1
         with:
-          task-definition: ${{ steps.taskdef2.outputs.task-definition }}
-          container-name: order-service
-          image: ${{ env.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/order-service:${{ env.IMAGE_TAG }}
+          task-definition: ${{ env.ECS_TASKDEF_ORDER }}
+          container-name: ${{ env.CONTAINER_NAME_ORDER }}
+          image: ${{ env.ECR_REGISTRY }}/order-service:${{ env.IMAGE_TAG }}
 
       - name: Render taskdef (product-service)
-        id: taskdef4
+        id: render-product
         uses: aws-actions/amazon-ecs-render-task-definition@v1
         with:
-          task-definition: ${{ steps.taskdef3.outputs.task-definition }}
-          container-name: product-service
-          image: ${{ env.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/product-service:${{ env.IMAGE_TAG }}
+          task-definition: ${{ env.ECS_TASKDEF_PRODUCT }}
+          container-name: ${{ env.CONTAINER_NAME_PRODUCT }}
+          image: ${{ env.ECR_REGISTRY }}/product-service:${{ env.IMAGE_TAG }}
 
-      # Deploy to ECS (register new revision + update service)
-      - name: Deploy to ECS
+      # -------------------------
+      # DEPLOY TO ECS (force new deployment)
+      # -------------------------
+      - name: Deploy to ECS (gateway)
         uses: aws-actions/amazon-ecs-deploy-task-definition@v2
         with:
-          task-definition: ${{ steps.taskdef4.outputs.task-definition }}
-          service: ${{ env.ECS_SERVICE }}
+          task-definition: ${{ steps.render-gateway.outputs.task-definition }}
+          service: ${{ env.ECS_SERVICE_GATEWAY }}
+          cluster: ${{ env.ECS_CLUSTER }}
+          wait-for-service-stability: true
+
+      - name: Deploy to ECS (auth-service)
+        uses: aws-actions/amazon-ecs-deploy-task-definition@v2
+        with:
+          task-definition: ${{ steps.render-auth.outputs.task-definition }}
+          service: ${{ env.ECS_SERVICE_AUTH }}
+          cluster: ${{ env.ECS_CLUSTER }}
+          wait-for-service-stability: true
+
+      - name: Deploy to ECS (order-service)
+        uses: aws-actions/amazon-ecs-deploy-task-definition@v2
+        with:
+          task-definition: ${{ steps.render-order.outputs.task-definition }}
+          service: ${{ env.ECS_SERVICE_ORDER }}
+          cluster: ${{ env.ECS_CLUSTER }}
+          wait-for-service-stability: true
+
+      - name: Deploy to ECS (product-service)
+        uses: aws-actions/amazon-ecs-deploy-task-definition@v2
+        with:
+          task-definition: ${{ steps.render-product.outputs.task-definition }}
+          service: ${{ env.ECS_SERVICE_PRODUCT }}
           cluster: ${{ env.ECS_CLUSTER }}
           wait-for-service-stability: true
