@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Cloud-Native Microservices Platform</title>
+  <link rel="stylesheet" href="./styles.css" />
+</head>
+<body>
+
+  <div class="container">
+    <h1>Cloud-Native Microservices Platform</h1>
+    <p class="subtitle">Simple frontend to test your deployed AWS microservices</p>
+
+    <div class="card">
+      <h2>API Health Check</h2>
+
+      <label>API Base URL</label>
+      <input
+        id="apiBase"
+        type="text"
+        value="https://api.nikunjmirajkar.com"
+      />
+
+      <button id="healthBtn">Check /health</button>
+
+      <pre id="output">Click the button to test your API.</pre>
+    </div>
+
+    <footer>
+      <p>
+        Backend deployed on AWS ECS · CI/CD via GitHub Actions · Frontend via GitHub Pages
+      </p>
+    </footer>
+  </div>
+
+  <script src="./app.js"></script>
+</body>
+</html>
