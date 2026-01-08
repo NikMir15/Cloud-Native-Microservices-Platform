@@ -1,94 +1,47 @@
-# Cloud-Native Microservices Platform (AWS)
+# Cloud-Native Microservices Platform
+
+Cloud-native microservices platform using **FastAPI**, **JWT authentication**, **Docker Compose**, and an **Nginx API Gateway** — with an AWS-ready path using **ECS Fargate + ALB + Route 53 + ACM**.
 
 ## Overview
-This project demonstrates a **cloud-native microservices architecture** deployed on **AWS** using modern DevOps and infrastructure best practices.  
-It focuses on **scalability, security, container orchestration, and production-grade networking** rather than only application code.
+This project demonstrates how to design and run a microservices platform with:
+- A single entry point (API Gateway)
+- Independently deployable services
+- Container-first local development (Docker Compose)
+- Production-style AWS deployment architecture (ECS/ALB/HTTPS/DNS)
 
-The platform is designed to be extended with multiple backend services behind a single API gateway and load balancer.
-
----
+## Tech Stack
+- Backend: FastAPI (Python), JWT Auth
+- Gateway: Nginx (reverse proxy / routing)
+- Containers: Docker, Docker Compose
+- CI/CD: GitHub Actions (workflows in `.github/workflows`)
+- AWS (deployment-ready): ECS Fargate, ALB, ECR, Route 53, ACM
 
 ## Architecture
 High-level flow:
 
-Client
-|
-v
-Application Load Balancer (ALB)
-|
-v
-ECS Cluster (Fargate)
-|
-+--> API Gateway / Nginx
-|
-+--> Auth Service
-|
-+--> Other Microservices (future)
+Client  
+→ (Local) Nginx Gateway → Services (FastAPI)  
+→ (AWS) ALB (HTTPS) → ECS (Fargate) → Nginx Gateway → Services
 
-
-### Key Design Decisions
-- **ALB** handles traffic distribution and HTTPS termination  
-- **ECS Fargate** runs containers without managing servers  
-- **Task definitions** separate infrastructure from application code  
-- **Route 53** manages DNS for subdomains (keeps main portfolio safe)  
-- **ACM** provides SSL certificates
-
----
-
-## Tech Stack
-- AWS ECS (Fargate)
-- Application Load Balancer (ALB)
-- Amazon ECR
-- AWS Route 53
-- AWS Certificate Manager (ACM)
-- Docker
-- Nginx (Gateway)
-- Git & GitHub
-
----
+Key design decisions:
+- Gateway handles routing to internal services
+- Services are isolated and can scale independently
+- Infra concerns (DNS/SSL/LB) are handled at the platform layer
 
 ## Repository Structure
-cloud-native-microservices-platform/
-│
-├── gateway/
-│ ├── Dockerfile.ecs
-│ └── nginx.ecs.conf
-│
-├── ecs-trust.json
-├── taskdef.json
-├── .gitignore
-└── README.md
+- `frontend/` — UI
+- `gateway/` — Nginx gateway config + Dockerfile
+- `services/` — backend microservices (FastAPI)
+- `docker-compose.yml` — local orchestration
+- `ecs/`, `taskdef.json`, `ecs-trust.json` — ECS deployment assets
+- `.github/workflows/` — CI/CD workflows
 
+## How to Run Locally (Docker Compose)
+### Prerequisites
+- Docker + Docker Compose installed
 
----
-
-## How It Works
-1. Traffic enters through an **Application Load Balancer**
-2. ALB forwards requests to ECS services
-3. Nginx acts as a **gateway** to route requests to internal services
-4. Services run as containers and can scale independently
-5. DNS and SSL are handled at the infrastructure layer
-
----
-
-## Key Features
-- Containerized microservices deployment
-- Load-balanced architecture using ALB
-- HTTPS using ACM certificates
-- DNS routing using Route 53
-- Gateway routing (Nginx) for microservice endpoints
-- Cloud-ready design for autoscaling & CI/CD
-
----
-
-## Future Improvements
-- ECS Service Auto Scaling policies
-- CI/CD pipeline (GitHub Actions)
-- Observability dashboards (CloudWatch)
-- Auth hardening (JWT verification between services)
-- Rate limiting / WAF integration
-
----
-
-## Notes
-This project is intentionally **infrastructure-focused** to demonstrate real-world cloud engineering skills.
+### Run
+```bash
+git clone https://github.com/NikMir15/Cloud-Native-Microservices-Platform.git
+cd Cloud-Native-Microservices-Platform
+docker compose up --build
